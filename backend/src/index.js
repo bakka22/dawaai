@@ -11,7 +11,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const relayRoutes = require('./routes/relay');
+const authRoutes = require('./routes/auth');
+
 app.use('/api', relayRoutes);
+app.use('/api/auth', authRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
