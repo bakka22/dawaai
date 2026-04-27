@@ -46,5 +46,3 @@ final prescriptionServiceProvider = Provider<PrescriptionService>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return PrescriptionService(apiClient);
 });
-
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());

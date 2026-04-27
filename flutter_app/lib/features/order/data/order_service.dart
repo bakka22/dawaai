@@ -46,5 +46,3 @@ final orderServiceProvider = Provider<OrderService>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return OrderService(apiClient);
 });
-
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());

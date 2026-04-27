@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/api_client.dart' hide apiClientProvider;
+import '../../../../core/services/api_client.dart';
 import '../../../auth/data/auth_state.dart';
 import '../../data/order_service.dart';
 
