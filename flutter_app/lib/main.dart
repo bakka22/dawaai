@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'features/auth/presentation/pages/login_page.dart';
+import 'features/auth/data/auth_state.dart';
 
 void main() {
   runApp(const ProviderScope(child: DawaaiApp()));
@@ -25,8 +27,23 @@ class DawaaiApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
         useMaterial3: true,
       ),
-      home: const HomePage(),
+      home: const AuthWrapper(),
     );
+  }
+}
+
+class AuthWrapper extends ConsumerWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    if (authState.status == AuthStatus.authenticated) {
+      return const HomePage();
+    }
+
+    return const LoginPage();
   }
 }
 
@@ -43,7 +60,7 @@ class HomePage extends StatelessWidget {
       ),
       body: const Directionality(
         textDirection: TextDirection.rtl,
-        child: Center(child: Text('Dawaai App - Riverpod Ready')),
+        child: Center(child: Text('Dawaai App - Authenticated!')),
       ),
     );
   }

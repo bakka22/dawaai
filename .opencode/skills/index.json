@@ -1,0 +1,14 @@
+{
+  "skills": [
+    {
+      "name": "flutter-code-structure",
+      "path": "flutter-code-structure/SKILL.md",
+      "description": "Flutter architecture, package selection, debugging, refactoring, and project-structure best practices"
+    },
+    {
+      "name": "flutter-frontend-design",
+      "path": "flutter-frontend-design/SKILL.md",
+      "description": "Flutter frontend UI, screens, widgets, layouts, navigation, Arabic/RTL support, and frontend architecture"
+    }
+  ]
+}
