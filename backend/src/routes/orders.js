@@ -134,4 +134,317 @@ router.get('/:order_id', async (req, res) => {
   }
 });
 
+router.get('/:order_id/invoice', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+
+    const orderResult = await pool.query(
+      `SELECT o.*, u.phone as customer_phone
+       FROM orders o
+       JOIN users u ON o.customer_id = u.id
+       WHERE o.id = $1`,
+      [order_id]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = orderResult.rows[0];
+
+    const segmentsResult = await pool.query(
+      `SELECT os.*, p.name as pharmacy_name, p.city as pharmacy_city
+       FROM order_segments os
+       JOIN pharmacies p ON os.pharmacy_id = p.id
+       WHERE os.order_id = $1`,
+      [order_id]
+    );
+
+    const itemsResult = await pool.query(
+      `SELECT oi.*, m.name as medication_name
+       FROM order_items oi
+       JOIN medications m ON oi.medication_id = m.id
+       WHERE oi.order_id = $1`,
+      [order_id]
+    );
+
+    const segments = segmentsResult.rows;
+    const items = itemsResult.rows;
+
+    const subtotal = parseFloat(order.total_price) || 0;
+    const deliveryFee = parseFloat(order.delivery_fee) || 0;
+    const total = subtotal + deliveryFee;
+
+    res.json({
+      invoice: {
+        order_id: order.id,
+        status: order.status,
+        created_at: order.created_at,
+        customer_phone: order.customer_phone,
+      },
+      segments: segments.map(s => ({
+        segment_id: s.id,
+        pharmacy_name: s.pharmacy_name,
+        pharmacy_city: s.pharmacy_city,
+        status: s.status,
+        subtotal: parseFloat(s.subtotal) || 0,
+        delivery_fee: parseFloat(s.delivery_fee) || 0,
+      })),
+      items: items.map(i => ({
+        medication_name: i.medication_name,
+        quantity: i.quantity,
+        price: parseFloat(i.price) || 0,
+      })),
+      summary: {
+        subtotal,
+        delivery_fee: deliveryFee,
+        total,
+        currency: 'SDG',
+      },
+    });
+  } catch (err) {
+    console.error('Get invoice error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:order_id/accept', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const { pharmacy_id } = req.body;
+
+    if (!pharmacy_id) {
+      return res.status(400).json({ error: 'pharmacy_id required' });
+    }
+
+    const result = await pool.query(
+      `UPDATE order_segments 
+       SET status = 'CONFIRMED', updated_at = NOW()
+       WHERE order_id = $1 AND pharmacy_id = $2
+       RETURNING *`,
+      [order_id, pharmacy_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Segment not found' });
+    }
+
+    const allSegments = await pool.query(
+      `SELECT status FROM order_segments WHERE order_id = $1`,
+      [order_id]
+    );
+
+    const allConfirmed = allSegments.rows.every(s => s.status === 'CONFIRMED');
+    if (allConfirmed) {
+      await pool.query(
+        `UPDATE orders SET status = 'CONFIRMED', updated_at = NOW() WHERE id = $1`,
+        [order_id]
+      );
+    }
+
+    res.json({ success: true, segment: result.rows[0] });
+  } catch (err) {
+    console.error('Accept segment error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:order_id/prepare', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const { pharmacy_id } = req.body;
+
+    if (!pharmacy_id) {
+      return res.status(400).json({ error: 'pharmacy_id required' });
+    }
+
+    const result = await pool.query(
+      `UPDATE order_segments 
+       SET status = 'READY', updated_at = NOW()
+       WHERE order_id = $1 AND pharmacy_id = $2
+       RETURNING *`,
+      [order_id, pharmacy_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Segment not found' });
+    }
+
+    await pool.query(
+      `UPDATE orders SET status = 'PREPARING', updated_at = NOW() WHERE id = $1`,
+      [order_id]
+    );
+
+    res.json({ success: true, segment: result.rows[0] });
+  } catch (err) {
+    console.error('Prepare segment error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:order_id/verify-delivery', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const { driver_id, prescription_photo_url, signature_confirmed } = req.body;
+
+    if (!driver_id) {
+      return res.status(400).json({ error: 'driver_id required' });
+    }
+
+    const orderResult = await pool.query(
+      'SELECT status FROM orders WHERE id = $1',
+      [order_id]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const currentStatus = orderResult.rows[0].status;
+    const allowedStatuses = ['READY_FOR_PICKUP', 'DISPATCHED'];
+
+    if (!allowedStatuses.includes(currentStatus)) {
+      return res.status(400).json({ 
+        error: `Cannot verify delivery. Current status: ${currentStatus}` 
+      });
+    }
+
+    if (prescription_photo_url) {
+      await pool.query(
+        `INSERT INTO order_delivery_proofs (order_id, driver_id, proof_type, proof_url, created_at)
+         VALUES ($1, $2, 'PRESCRIPTION_PHOTO', $3, NOW())
+         ON CONFLICT (order_id) DO UPDATE SET proof_url = $3, updated_at = NOW()`,
+        [order_id, driver_id, prescription_photo_url]
+      );
+    }
+
+    if (signature_confirmed) {
+      await pool.query(
+        `INSERT INTO order_delivery_proofs (order_id, driver_id, proof_type, created_at)
+         VALUES ($1, $2, 'SIGNATURE', 'confirmed', NOW())
+         ON CONFLICT (order_id) DO UPDATE SET proof_type = 'SIGNATURE', updated_at = NOW()`,
+        [order_id, driver_id]
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Delivery verification recorded',
+      requires_photo: !prescription_photo_url,
+    });
+  } catch (err) {
+    console.error('Verify delivery error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:order_id/complete', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const { driver_id } = req.body;
+
+    if (!driver_id) {
+      return res.status(400).json({ error: 'driver_id required' });
+    }
+
+    const proofResult = await pool.query(
+      'SELECT * FROM order_delivery_proofs WHERE order_id = $1',
+      [order_id]
+    );
+
+    if (proofResult.rows.length === 0) {
+      return res.status(400).json({ 
+        error: 'Cannot complete order. No delivery proof recorded.' 
+      });
+    }
+
+    const hasPhoto = proofResult.rows.some(p => p.proof_type === 'PRESCRIPTION_PHOTO');
+    const hasSignature = proofResult.rows.some(p => p.proof_type === 'SIGNATURE');
+
+    if (!hasPhoto) {
+      return res.status(400).json({ 
+        error: 'Cannot complete order. Prescription photo is required.' 
+      });
+    }
+
+    await pool.query('BEGIN');
+
+    await pool.query(
+      `UPDATE orders SET status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
+      [order_id]
+    );
+
+    await pool.query(
+      `UPDATE order_segments SET status = 'DELIVERED', updated_at = NOW() WHERE order_id = $1`,
+      [order_id]
+    );
+
+    await pool.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Order completed successfully',
+      status: 'COMPLETED',
+    });
+  } catch (err) {
+    await pool.query('ROLLBACK');
+    console.error('Complete order error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/:order_id/trip-status', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+
+    const orderResult = await pool.query(
+      `SELECT o.id, o.status, o.customer_id, u.phone as customer_phone
+       FROM orders o
+       JOIN users u ON o.customer_id = u.id
+       WHERE o.id = $1`,
+      [order_id]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const segmentsResult = await pool.query(
+      `SELECT os.*, p.name as pharmacy_name, p.phone as pharmacy_phone
+       FROM order_segments os
+       JOIN pharmacies p ON os.pharmacy_id = p.id
+       WHERE os.order_id = $1`,
+      [order_id]
+    );
+
+    const proofResult = await pool.query(
+      'SELECT * FROM order_delivery_proofs WHERE order_id = $1',
+      [order_id]
+    );
+
+    const order = orderResult.rows[0];
+    const segments = segmentsResult.rows;
+    const proofs = proofResult.rows;
+
+    res.json({
+      order_id: order.id,
+      status: order.status,
+      customer_phone: order.customer_phone,
+      segments: segments.map(s => ({
+        pharmacy_name: s.pharmacy_name,
+        pharmacy_phone: s.pharmacy_phone,
+        status: s.status,
+      })),
+      delivery_proof: {
+        prescription_photo: proofs.some(p => p.proof_type === 'PRESCRIPTION_PHOTO'),
+        signature: proofs.some(p => p.proof_type === 'SIGNATURE'),
+      },
+      can_complete: order.status === 'READY_FOR_PICKUP' && proofs.some(p => p.proof_type === 'PRESCRIPTION_PHOTO'),
+    });
+  } catch (err) {
+    console.error('Trip status error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
