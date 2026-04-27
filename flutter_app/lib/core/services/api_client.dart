@@ -9,7 +9,7 @@ class ApiClient {
   ApiClient({String? baseUrl}) {
     _dio = Dio(
       BaseOptions(
-        baseUrl: baseUrl ?? 'http://localhost:3000/api',
+        baseUrl: baseUrl ?? 'https://sectional-subpanel-junkman.ngrok-free.dev',
         connectTimeout: const Duration(seconds: 30),
         receiveTimeout: const Duration(seconds: 30),
         headers: {'Content-Type': 'application/json'},

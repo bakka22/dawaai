@@ -1,4 +1,4 @@
-# Dawaai MVP Implementation Plan (Final Hardened Version)
+# Dawaai MVP Implementation Plan (Complete Hardened Version)
 
 # ROLE: Senior Full-Stack Architect & Project Lead
 # TASK: Build the Dawaai MVP (Medication Discovery & Delivery System)
@@ -136,6 +136,68 @@
 - **Task 1:** Driver app displays step-by-step instructions (e.g., "Collect Paper First").
 - **Task 2:** Driver must upload a photo of the prescription at the door to unlock the "Complete Order" button.
 - **Verification:** Order status only moves to 'COMPLETED' after photo upload is verified by the server.
+
+## PHASE 21: DB - Cosmetics & Personalization
+- **Goal:** Schema for the habit utility layer.
+- **Task 1:** Create `cosmetic_products` table with `id`, `name`, `target_skin_type`, `concerns` (JSONB), and `price`.
+- **Task 2:** Add `skin_type` and `concerns` columns to the `user_profiles` table.
+- **Verification:** Confirm metadata columns exist in DB.
+
+## PHASE 22: Flutter - Onboarding Quiz (Skin Type)
+- **Goal:** Capture user metadata for personalization.
+- **Task 1:** Build a 4-question quiz screen (e.g., "What is your skin type?").
+- **Task 2:** Logic: Save responses to the backend `POST /api/user/profile`.
+- **Verification:** User profile in DB is updated with quiz results.
+
+## PHASE 23: Backend - Rule-Based Recommendation Engine
+- **Goal:** Personalized product feed.
+- **Task 1:** Implement `GET /api/cosmetics/recommendations`.
+- **Task 2:** SQL Logic: Filter `cosmetic_products` by user's `skin_type` and `concerns`.
+- **Verification:** API returns products that match the user's specific profile.
+
+## PHASE 24: Flutter - "For You" Feed (Canva Style)
+- **Goal:** Visually appealing habit-layer home.
+- **Task 1:** Implement a compact, thumbnail-led grid of cosmetic products.
+- **Task 2:** Add "Why this?" tags based on metadata (e.g., "Safe for sensitive skin").
+- **Verification:** Feed shows personalized products with explanation badges.
+
+## PHASE 25: Pharmacist - Barcode/OCR Bulk Update
+- **Goal:** Efficiency in inventory management.
+- **Task 1:** Implement `google_ml_kit` barcode scanning in the pharmacist portal.
+- **Task 2:** Batch scan mode: Scanning a box toggles `is_in_stock` in the DB instantly.
+- **Verification:** Scanning 5 boxes updates 5 stock rows in the database.
+
+## PHASE 26: Offline - Hive/SQLite Caching
+- **Goal:** View orders without internet.
+- **Task 1:** Implement `Hive` storage in Flutter to cache `OrderHistory`.
+- **Task 2:** Logic: Every successful API fetch updates the local cache.
+- **Verification:** Turn off Wi-Fi; order history remains visible in the app.
+
+## PHASE 27: Driver - Multi-Stop UI
+- **Goal:** Clarity for complex trips.
+- **Task 1:** UI that shows the waypoint sequence clearly: [1] Customer, [2] Pharmacy A, [3] Pharmacy B, [4] Customer.
+- **Task 2:** Deep-link "Navigate" button for each specific stop.
+- **Verification:** Driver can click navigate for stop #2 independently of stop #1.
+
+## PHASE 28: Backend - Payment Verification Webhooks
+- **Goal:** Secure third-party payment integration.
+- **Task 1:** Create `/api/payments/verify` endpoint to receive signals from Sudanese payment gateways.
+- **Task 2:** Logic: Only mark order as 'PAID' after a 200 OK from the gateway.
+- **Verification:** Mock a gateway signal; confirm order status changes to 'PAID'.
+
+## PHASE 29: Admin Panel - Pharmacy Gatekeeping
+- **Goal:** Quality control.
+- **Task 1:** Web-based Admin UI to view registered pharmacies.
+- **Task 2:** "Approve/Reject" buttons that toggle `pharmacies.is_approved`.
+- **Verification:** Unapproved pharmacies cannot receive broadcast quotes.
+
+## PHASE 30: Final Polishing & Branding
+- **Goal:** Market-ready aesthetics.
+- **Task 1:** Implement final Dawaai branding colors, icons, and logo.
+- **Task 2:** Complete RTL alignment audit for all screens and snackbars.
+- **Verification:** All UI elements follow the design system and Arabic alignment.
+
+*(Phases 31-40 would be used for Stress Testing, AWS Relay deployment, and Pilot Launch tasks if needed)*
 
 ---
 
