@@ -178,12 +178,29 @@ Before implementing any feature or fix:
    - Run `flutter test` in `/flutter_app`
    - Run `flutter analyze` to check for issues
 
+### Hard Rule: All Tests Must Pass
+
+**ALL TESTS MUST PASS BEFORE MOVING TO THE NEXT PHASE**
+
+- No exceptions: 100% test pass rate required
+- If any test fails, fix it before proceeding
+- This applies to both backend (`npm test`) and Flutter (`flutter test`)
+- Run full test suite after implementing each phase
+- Do not skip or ignore failing tests
+
 ### General Testing Guidelines
 
 - Run the smallest relevant test first.
 - For Flutter UI changes, run `flutter analyze` and relevant widget tests.
 - For backend logic, run service/API tests where available.
 - Do not ignore failing tests unless the failure is clearly unrelated and reported.
+
+### Soft Rule: Commit After Phase Completion
+
+After completing a phase where all tests pass:
+- Check for unstaged work (`git status --short`)
+- If there are unstaged changes, stage, commit and push to remote
+- Use descriptive commit messages indicating what was done
 
 ---
 

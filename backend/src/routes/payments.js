@@ -17,6 +17,12 @@ async function addPaymentColumns() {
     await pool.query(`
       ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP;
     `);
+    await pool.query(`
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS prescription_confirmed BOOLEAN DEFAULT false;
+    `);
+    await pool.query(`
+      ALTER TABLE orders ADD COLUMN IF NOT EXISTS prescription_confirmed_at TIMESTAMP;
+    `);
     console.log('Payment columns added to orders table');
   } catch (err) {
     console.log('Payment columns might already exist:', err.message);

@@ -453,4 +453,200 @@ router.get('/:order_id/trip-status', async (req, res) => {
   }
 });
 
+router.get('/:order_id/status', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const parsedId = parseInt(order_id);
+
+    if (isNaN(parsedId) || parsedId <= 0) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+
+    const orderResult = await pool.query(
+      `SELECT o.*, u.phone as customer_phone
+       FROM orders o
+       JOIN users u ON o.customer_id = u.id
+       WHERE o.id = $1`,
+      [order_id]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = orderResult.rows[0];
+
+    const segmentsResult = await pool.query(
+      `SELECT os.*, p.name as pharmacy_name, p.lat as lat, p.lng as lng
+       FROM order_segments os
+       JOIN pharmacies p ON os.pharmacy_id = p.id
+       WHERE os.order_id = $1`,
+      [order_id]
+    );
+
+    const itemsResult = await pool.query(
+      `SELECT oi.*, m.name as medication_name, m.is_flagged
+       FROM order_items oi
+       JOIN medications m ON oi.medication_id = m.id
+       WHERE oi.order_id = $1`,
+      [order_id]
+    );
+
+    const isHighRisk = itemsResult.rows.some(i => i.is_flagged);
+
+    const activeStatuses = ['PENDING', 'PREPARING', 'READY_FOR_PICKUP', 'IN_TRANSIT', 'DISPATCHED'];
+    const isActive = activeStatuses.includes(order.status);
+
+    const waypoints = segmentsResult.rows.map((s, index) => ({
+      type: s.status === 'PENDING' ? 'pharmacy' : 'pharmacy',
+      name: s.pharmacy_name,
+      lat: parseFloat(s.lat) || 0,
+      lng: parseFloat(s.lng) || 0,
+      order: index + 1,
+      status: s.status,
+    }));
+
+    if (order.status === 'IN_TRANSIT' || order.status === 'DISPATCHED') {
+      waypoints.push({
+        type: 'customer',
+        name: 'Delivery Location',
+        order: waypoints.length + 1,
+      });
+    }
+
+    const response = {
+      order_id: order.id,
+      status: order.status,
+      current_waypoint: order.status === 'IN_TRANSIT' || order.status === 'DISPATCHED' 
+        ? waypoints.length - 1 
+        : 0,
+      is_high_risk: isHighRisk,
+    };
+
+    if (isActive) {
+      response.waypoints = waypoints;
+    }
+
+    if (order.status === 'IN_TRANSIT' || order.status === 'DISPATCHED') {
+      const now = new Date();
+      const estimatedMinutes = 30;
+      const estimatedArrival = new Date(now.getTime() + estimatedMinutes * 60000);
+      response.estimated_arrival = estimatedArrival.toISOString();
+    }
+
+    res.json(response);
+  } catch (err) {
+    console.error('Order status error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:order_id/confirm-prescription', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const { driver_id } = req.body;
+    const parsedId = parseInt(order_id);
+
+    if (isNaN(parsedId) || parsedId <= 0) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+
+    if (!driver_id) {
+      return res.status(400).json({ error: 'driver_id required' });
+    }
+
+    const checkResult = await pool.query(
+      'SELECT prescription_confirmed FROM orders WHERE id = $1',
+      [order_id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    if (checkResult.rows[0].prescription_confirmed === true) {
+      return res.json({
+        success: true,
+        already_confirmed: true,
+        message: 'Prescription already confirmed',
+      });
+    }
+
+    await pool.query(
+      `UPDATE orders 
+       SET prescription_confirmed = true, 
+           prescription_confirmed_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $1`,
+      [order_id]
+    );
+
+    res.json({
+      success: true,
+      prescription_confirmed: true,
+      message: 'Prescription handover confirmed',
+    });
+  } catch (err) {
+    console.error('Confirm prescription error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/:order_id/pharmacy-address', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const parsedId = parseInt(order_id);
+
+    if (isNaN(parsedId) || parsedId <= 0) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+
+    const orderResult = await pool.query(
+      'SELECT prescription_confirmed, status FROM orders WHERE id = $1',
+      [order_id]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const isConfirmed = orderResult.rows[0].prescription_confirmed === true;
+    
+    if (!isConfirmed) {
+      return res.status(403).json({
+        error: 'Prescription must be confirmed before viewing pharmacy address',
+        requires_confirmation: true,
+      });
+    }
+
+    const segmentResult = await pool.query(
+      `SELECT os.*, p.name as pharmacy_name, p.address as pharmacy_address, 
+              p.phone as pharmacy_phone, p.lat, p.lng
+       FROM order_segments os
+       JOIN pharmacies p ON os.pharmacy_id = p.id
+       WHERE os.order_id = $1
+       ORDER BY os.id ASC
+       LIMIT 1`,
+      [order_id]
+    );
+
+    if (segmentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No pharmacy segments found' });
+    }
+
+    const segment = segmentResult.rows[0];
+
+    res.json({
+      pharmacy_name: segment.pharmacy_name,
+      pharmacy_address: segment.pharmacy_address,
+      pharmacy_phone: segment.pharmacy_phone,
+      lat: parseFloat(segment.lat) || 0,
+      lng: parseFloat(segment.lng) || 0,
+    });
+  } catch (err) {
+    console.error('Pharmacy address error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
