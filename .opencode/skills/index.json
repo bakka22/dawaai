@@ -9,6 +9,11 @@
       "name": "flutter-frontend-design",
       "path": "flutter-frontend-design/SKILL.md",
       "description": "Flutter frontend UI, screens, widgets, layouts, navigation, Arabic/RTL support, and frontend architecture"
+    },
+    {
+      "name": "nodejs-backend",
+      "path": "nodejs-backend/SKILL.md",
+      "description": "Node.js/Express backend development, API design, database integration, authentication, and server-side best practices"
     }
   ]
 }

@@ -20,6 +20,8 @@ const quotesRoutes = require('./routes/quotes');
 const ordersRoutes = require('./routes/orders');
 const logisticsRoutes = require('./routes/logistics');
 const userRoutes = require('./routes/user');
+const cosmeticsRoutes = require('./routes/cosmetics');
+const pharmacistRoutes = require('./routes/pharmacist');
 
 app.use('/api', relayRoutes);
 app.use('/api/auth', authRoutes);
@@ -29,6 +31,8 @@ app.use('/api/quotes', quotesRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/logistics', logisticsRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/cosmetics', cosmeticsRoutes);
+app.use('/api/pharmacist', pharmacistRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

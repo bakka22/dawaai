@@ -35,6 +35,38 @@ class PharmacistService {
     final response = await _dio.get('/quotes/$quoteId/responses');
     return response.data as Map<String, dynamic>;
   }
+
+  Future<Map<String, dynamic>?> lookupMedicationByBarcode(
+    String barcode,
+  ) async {
+    try {
+      final response = await _dio.get(
+        '/pharmacist/inventory/lookup',
+        queryParameters: {'barcode': barcode},
+      );
+      if (response.data['medication'] != null) {
+        return response.data['medication'] as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<void> updateInventoryStock({
+    required int pharmacyId,
+    required int medicationId,
+    required bool isInStock,
+  }) async {
+    await _dio.put(
+      '/pharmacist/inventory/update',
+      data: {
+        'pharmacy_id': pharmacyId,
+        'medication_id': medicationId,
+        'is_in_stock': isInStock,
+      },
+    );
+  }
 }
 
 final pharmacistServiceProvider = Provider<PharmacistService>((ref) {
