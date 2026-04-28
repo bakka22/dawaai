@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../data/driver_service.dart';
 
 class DriverHomePage extends ConsumerStatefulWidget {
@@ -197,9 +198,9 @@ class _TripCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tripType = tripData['trip_type'] as String? ?? 'STANDARD';
     final hasRegulated =
         tripData['has_regulated_medications'] as bool? ?? false;
+    final waypoints = tripData['waypoints'] as List? ?? [];
     final instructions = tripData['instructions'] as List? ?? [];
 
     return Card(
@@ -239,30 +240,11 @@ class _TripCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            if (hasRegulated)
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.warning, color: Colors.red, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'تحذير: يتطلب جمع الوصفة الطبية من العميل أولاً',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            const Divider(),
+            const SizedBox(height: 12),
+            if (waypoints.isNotEmpty) ...[
+              _buildWaypointSequence(waypoints),
+              const Divider(height: 24),
+            ],
             ...instructions.asMap().entries.map((entry) {
               final idx = entry.key;
               final inst = entry.value;
@@ -270,48 +252,186 @@ class _TripCard extends StatelessWidget {
               final type = inst['type'] as String? ?? '';
               final message = inst['message'] as String? ?? '';
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundColor: step == 1 ? Colors.green : Colors.blue,
-                      child: Text(
-                        '$step',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _getStepTitle(type),
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            message,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (step == instructions.length)
-                      const Icon(Icons.check_circle, color: Colors.green),
-                  ],
-                ),
+              return _InstructionStep(
+                step: step,
+                type: type,
+                message: message,
+                totalSteps: instructions.length,
               );
             }),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildWaypointSequence(List waypoints) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'تسلسل المحطات',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.blue,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ...waypoints.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final wp = entry.value;
+          final wpType = wp['type'] as String? ?? '';
+          final name = wp['name'] as String? ?? 'محطة ${idx + 1}';
+          final lat = wp['lat'] as double? ?? 0;
+          final lng = wp['lng'] as double? ?? 0;
+
+          return _WaypointTile(
+            index: idx + 1,
+            name: name,
+            type: wpType,
+            lat: lat,
+            lng: lng,
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _WaypointTile extends StatelessWidget {
+  final int index;
+  final String name;
+  final String type;
+  final double lat;
+  final double lng;
+
+  const _WaypointTile({
+    required this.index,
+    required this.name,
+    required this.type,
+    required this.lat,
+    required this.lng,
+  });
+
+  Color get _color {
+    switch (type) {
+      case 'CUSTOMER':
+        return Colors.green;
+      case 'PHARMACY':
+        return Colors.orange;
+      default:
+        return Colors.blue;
+    }
+  }
+
+  String get _label {
+    switch (type) {
+      case 'CUSTOMER':
+        return 'العميل';
+      case 'PHARMACY':
+        return 'صيدلية';
+      default:
+        return 'محطة';
+    }
+  }
+
+  Future<void> _openNavigation() async {
+    final url = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
+    );
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(color: _color, shape: BoxShape.circle),
+            child: Center(
+              child: Text(
+                '$index',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(_label, style: TextStyle(fontSize: 12, color: _color)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.navigation, color: Colors.blue),
+            onPressed: _openNavigation,
+            tooltip: 'فتح في خرائط Google',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InstructionStep extends StatelessWidget {
+  final int step;
+  final String type;
+  final String message;
+  final int totalSteps;
+
+  const _InstructionStep({
+    required this.step,
+    required this.type,
+    required this.message,
+    required this.totalSteps,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 12,
+            backgroundColor: step == totalSteps ? Colors.green : Colors.blue,
+            child: Text(
+              '$step',
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _getStepTitle(type),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  message,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          if (step == totalSteps)
+            const Icon(Icons.check_circle, color: Colors.green),
+        ],
       ),
     );
   }

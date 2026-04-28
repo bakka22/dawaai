@@ -1,11 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../../../core/services/api_client.dart';
+import '../../../core/services/offline_cache_service.dart';
 
 class OrderService {
   final Dio _dio;
+  final OfflineCacheService _cache;
 
-  OrderService(ApiClient apiClient) : _dio = apiClient.dio;
+  OrderService(ApiClient apiClient, this._cache) : _dio = apiClient.dio;
 
   Future<Map<String, dynamic>> createOrder({
     required int customerId,
@@ -32,8 +34,18 @@ class OrderService {
   }
 
   Future<List<dynamic>> getCustomerOrders(int customerId) async {
-    final response = await _dio.get('/orders/customer/$customerId');
-    return response.data['orders'] as List<dynamic>;
+    try {
+      final response = await _dio.get('/orders/customer/$customerId');
+      final orders = response.data['orders'] as List<dynamic>;
+      await _cache.cacheOrders(customerId, orders.cast<Map<String, dynamic>>());
+      return orders;
+    } catch (e) {
+      final cachedOrders = await _cache.getCachedOrders(customerId);
+      if (cachedOrders != null) {
+        return cachedOrders;
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> getOrderDetails(int orderId) async {
@@ -44,5 +56,5 @@ class OrderService {
 
 final orderServiceProvider = Provider<OrderService>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return OrderService(apiClient);
+  return OrderService(apiClient, offlineCacheServiceProvider);
 });
