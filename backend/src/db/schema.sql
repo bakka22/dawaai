@@ -101,3 +101,81 @@ CREATE INDEX idx_quotes_status ON quotes(status);
 CREATE INDEX idx_quotes_expires ON quotes(expires_at);
 CREATE INDEX idx_quote_responses_quote ON quote_responses(quote_id);
 CREATE INDEX idx_quote_responses_pharmacy ON quote_responses(pharmacy_id);
+
+-- Phase 18: Orders & Segments
+
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES users(id),
+    pharmacy_id INTEGER NOT NULL REFERENCES pharmacies(id),
+    quote_id INTEGER REFERENCES quotes(id),
+    status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'COMPLETED', 'CANCELLED')),
+    total_price DECIMAL(10, 2),
+    notes TEXT,
+    delivery_fee DECIMAL(10, 2) DEFAULT 0,
+    delivery_address TEXT,
+    customer_lat DECIMAL(10, 8),
+    customer_lng DECIMAL(11, 8),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    medication_id INTEGER NOT NULL REFERENCES medications(id),
+    quantity INTEGER DEFAULT 1,
+    price DECIMAL(10, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE order_segments (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    pharmacy_id INTEGER NOT NULL REFERENCES pharmacies(id),
+    status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DISPATCHED', 'DELIVERED', 'CANCELLED')),
+    delivery_fee DECIMAL(10, 2) DEFAULT 0,
+    subtotal DECIMAL(10, 2),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE order_delivery_proofs (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id),
+    driver_id INTEGER REFERENCES users(id),
+    proof_type VARCHAR(50) NOT NULL,
+    proof_url TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(order_id, proof_type)
+);
+
+CREATE INDEX idx_orders_customer ON orders(customer_id);
+CREATE INDEX idx_orders_pharmacy ON orders(pharmacy_id);
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_segments_order ON order_segments(order_id);
+CREATE INDEX idx_order_segments_pharmacy ON order_segments(pharmacy_id);
+CREATE INDEX idx_delivery_proofs_order ON order_delivery_proofs(order_id);
+
+-- Phase 21: Cosmetic Products & User Profile
+
+CREATE TABLE cosmetic_products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    brand VARCHAR(100),
+    target_skin_type VARCHAR(50),
+    concerns JSONB DEFAULT '[]',
+    price DECIMAL(10, 2),
+    description TEXT,
+    image_url TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_cosmetic_skin_type ON cosmetic_products(target_skin_type);
+
+-- User Profile Extensions
+ALTER TABLE users ADD COLUMN IF NOT EXISTS skin_type VARCHAR(50);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS concerns JSONB DEFAULT '[]';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS has_completed_quiz BOOLEAN DEFAULT false;

@@ -49,6 +49,12 @@ router.post('/create', async (req, res) => {
         );
       }
 
+      await client.query(
+        `INSERT INTO order_segments (order_id, pharmacy_id, status, subtotal)
+         VALUES ($1, $2, 'PENDING', $3)`,
+        [order.id, pharmacy_id, total_price || 0]
+      );
+
       await client.query('COMMIT');
 
       res.json({
