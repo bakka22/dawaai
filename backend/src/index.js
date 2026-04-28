@@ -19,6 +19,7 @@ const searchRoutes = require('./routes/search');
 const quotesRoutes = require('./routes/quotes');
 const ordersRoutes = require('./routes/orders');
 const logisticsRoutes = require('./routes/logistics');
+const userRoutes = require('./routes/user');
 
 app.use('/api', relayRoutes);
 app.use('/api/auth', authRoutes);
@@ -27,6 +28,7 @@ app.use('/api/search', searchRoutes);
 app.use('/api/quotes', quotesRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/logistics', logisticsRoutes);
+app.use('/api/user', userRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
