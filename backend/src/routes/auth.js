@@ -107,6 +107,9 @@ router.post('/refresh', async (req, res) => {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Refresh token expired' });
     }
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid refresh token' });
+    }
     console.error('Refresh error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -118,6 +121,11 @@ router.post('/register', async (req, res) => {
 
     if (!phone || !password) {
       return res.status(400).json({ error: 'Phone and password required' });
+    }
+
+    const validRoles = ['customer', 'pharmacist', 'admin'];
+    if (role && !validRoles.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be customer, pharmacist, or admin' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);

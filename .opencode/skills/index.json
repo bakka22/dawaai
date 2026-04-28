@@ -14,6 +14,11 @@
       "name": "nodejs-backend",
       "path": "nodejs-backend/SKILL.md",
       "description": "Node.js/Express backend development, API design, database integration, authentication, and server-side best practices"
+    },
+    {
+      "name": "tdd-testing",
+      "path": "file:///D:/Projects/dawaai/.opencode/skills/tdd-testing/SKILL.md",
+      "description": "Test-Driven Development, unit testing, integration testing, mocking, and test automation best practices"
     }
   ]
 }

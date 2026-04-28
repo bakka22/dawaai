@@ -73,10 +73,12 @@ router.post('/broadcast', async (req, res) => {
 
     await client.query('COMMIT');
 
-    res.json({
-      quote_id: quote.id,
-      status: quote.status,
-      expires_at: quote.expires_at,
+    res.status(201).json({
+      quote: {
+        id: quote.id,
+        status: quote.status,
+        expires_at: quote.expires_at,
+      },
       medications_requested: medications,
       notified_pharmacies: pharmacyResult.rows.length,
       pharmacies: pharmacyResult.rows.map(p => ({
@@ -92,6 +94,25 @@ router.post('/broadcast', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   } finally {
     client.release();
+  }
+});
+
+router.get('/:quote_id', async (req, res) => {
+  try {
+    const { quote_id } = req.params;
+    const result = await pool.query(
+      'SELECT * FROM quotes WHERE id = $1',
+      [quote_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Quote not found' });
+    }
+
+    res.json({ quote: result.rows[0] });
+  } catch (err) {
+    console.error('Get quote error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

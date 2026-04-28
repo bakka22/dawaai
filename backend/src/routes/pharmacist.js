@@ -84,6 +84,15 @@ router.get('/inventory/:pharmacyId', async (req, res) => {
   try {
     const { pharmacyId } = req.params;
 
+    const pharmacyResult = await pool.query(
+      'SELECT id FROM pharmacies WHERE id = $1',
+      [pharmacyId]
+    );
+
+    if (pharmacyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Pharmacy not found' });
+    }
+
     const result = await pool.query(
       `SELECT pi.id, pi.medication_id, pi.is_in_stock, pi.price, pi.quantity, m.name, m.active_ingredient
        FROM pharmacy_inventory pi

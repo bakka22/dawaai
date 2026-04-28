@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/config');
 
+router.get('/', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, active_ingredient, synonyms, is_flagged FROM medications LIMIT 100'
+    );
+    res.json({ medications: result.rows });
+  } catch (err) {
+    console.error('Get medications error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
@@ -27,8 +39,7 @@ router.get('/search', async (req, res) => {
 
     res.json({
       query: searchTerm,
-      count: result.rows.length,
-      results: result.rows
+      medications: result.rows
     });
   } catch (err) {
     console.error('Medication search error:', err);

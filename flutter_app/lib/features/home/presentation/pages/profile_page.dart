@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/data/auth_state.dart';
+import '../../../onboarding/presentation/pages/onboarding_quiz_page.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});

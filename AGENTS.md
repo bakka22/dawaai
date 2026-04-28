@@ -152,6 +152,34 @@ npm test             # Run tests
 
 ## Testing Rules
 
+### TDD Workflow (Required for all tasks)
+
+Before implementing any feature or fix:
+
+1. **Write Tests First**: Create tests that define the intended behavior based on `@MVP-Plan.md` and `@SPEC.md`
+   - Backend tasks → Write tests in `backend/tests/`
+   - Flutter tasks → Write tests in `flutter_app/test/`
+   - Full-stack tasks → Write tests in both
+
+2. **Test Coverage Requirements**:
+   - **Normal cases**: Happy path behavior
+   - **Edge cases**: Boundary conditions, empty inputs, null values
+   - **Error cases**: Invalid inputs, network failures, validation errors
+
+3. **Run Tests Before Implementation**:
+   - Tests should fail initially (RED) because the feature doesn't exist yet
+   - This validates the tests are correct
+
+4. **Implement the Feature**: Write the minimum code needed to pass tests (GREEN)
+
+5. **Run Tests After Implementation**:
+   - All tests must pass with no errors
+   - Run `npm test` in `/backend`
+   - Run `flutter test` in `/flutter_app`
+   - Run `flutter analyze` to check for issues
+
+### General Testing Guidelines
+
 - Run the smallest relevant test first.
 - For Flutter UI changes, run `flutter analyze` and relevant widget tests.
 - For backend logic, run service/API tests where available.
