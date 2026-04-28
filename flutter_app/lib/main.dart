@@ -7,6 +7,7 @@ import 'features/prescription/presentation/pages/scan_prescription_page.dart';
 import 'features/orders/presentation/pages/orders_list_page.dart';
 import 'features/home/presentation/pages/profile_page.dart';
 import 'features/cosmetic/data/cosmetic_service.dart';
+import 'core/theme/app_theme.dart';
 
 void main() {
   runApp(const ProviderScope(child: DawaaiApp()));
@@ -19,7 +20,8 @@ class DawaaiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     debugPrint('Riverpod Ready');
     return MaterialApp(
-      title: 'Dawaai',
+      title: 'دواي - Dawaai',
+      debugShowCheckedModeBanner: false,
       locale: const Locale('ar'),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -27,10 +29,7 @@ class DawaaiApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('ar'), Locale('en')],
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
+      theme: DawaaiTheme.lightTheme,
       home: const AuthWrapper(),
     );
   }

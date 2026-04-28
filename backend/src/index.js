@@ -22,6 +22,8 @@ const logisticsRoutes = require('./routes/logistics');
 const userRoutes = require('./routes/user');
 const cosmeticsRoutes = require('./routes/cosmetics');
 const pharmacistRoutes = require('./routes/pharmacist');
+const paymentsRoutes = require('./routes/payments');
+const adminRoutes = require('./routes/admin');
 
 app.use('/api', relayRoutes);
 app.use('/api/auth', authRoutes);
@@ -33,6 +35,8 @@ app.use('/api/logistics', logisticsRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/cosmetics', cosmeticsRoutes);
 app.use('/api/pharmacist', pharmacistRoutes);
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
