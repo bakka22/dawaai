@@ -180,6 +180,13 @@ npm test             # Run tests
 
 ## Agent Behavior Rules
 
+- **Always use the appropriate skill for each task:**
+  - Backend/Node.js tasks → use `nodejs-backend` skill
+  - Flutter UI/UX tasks → use `flutter-frontend-design` skill
+  - Flutter architecture/code tasks → use `flutter-code-structure` skill
+
+- **Explicitly state the skill being used** when starting work on any task.
+
 - Explain risky operations before doing them.
 - Ask before destructive operations.
 - Preserve existing project style.
