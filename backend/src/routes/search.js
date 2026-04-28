@@ -54,30 +54,45 @@ router.post('/pharmacies', async (req, res) => {
         p.lat,
         p.lng,
         p.city,
+        p.opening_time,
+        p.closing_time,
         COUNT(pi.medication_id) as match_count
       FROM pharmacies p
       JOIN pharmacy_inventory pi ON p.id = pi.pharmacy_id
       ${whereClause}
-      GROUP BY p.id, p.name, p.lat, p.lng, p.city
+      GROUP BY p.id, p.name, p.lat, p.lng, p.city, p.opening_time, p.closing_time
       ORDER BY match_count DESC
       LIMIT ${parseInt(limit) + 1}
     `;
 
     const pharmacyResult = await pool.query(pharmacyQuery, params);
 
+    const now = new Date();
+    const currentTime = now.getHours() * 60 + now.getMinutes();
+
     const pharmacies = pharmacyResult.rows.map(p => {
       const distance = (userLat && userLng && p.lat && p.lng)
         ? calculateDistance(userLat, userLng, parseFloat(p.lat), parseFloat(p.lng))
         : null;
       
+      let closingInMinutes = null;
+      if (p.closing_time) {
+        const [hours, minutes] = p.closing_time.split(':').map(Number);
+        closingInMinutes = hours * 60 + minutes;
+      }
+
       return {
         pharmacy_id: p.pharmacy_id,
         name: p.name,
         city: p.city,
+        opening_time: p.opening_time,
+        closing_time: p.closing_time,
+        is_closing_soon: closingInMinutes !== null && (closingInMinutes - currentTime) <= 60 && (closingInMinutes - currentTime) > 0,
+        is_closed: closingInMinutes !== null && closingInMinutes < currentTime,
         match_count: parseInt(p.match_count),
         distance: distance ? parseFloat(distance.toFixed(2)) : null,
       };
-    });
+    }).filter(p => !p.is_closed);
 
     pharmacies.sort((a, b) => {
       if (b.match_count !== a.match_count) {

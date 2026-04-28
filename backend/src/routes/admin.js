@@ -2,6 +2,21 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/config');
 
+async function addPharmacyHoursColumns() {
+  try {
+    await pool.query(`
+      ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS opening_time TIME DEFAULT '08:00';
+    `);
+    await pool.query(`
+      ALTER TABLE pharmacies ADD COLUMN IF NOT EXISTS closing_time TIME DEFAULT '22:00';
+    `);
+    console.log('Pharmacy hours columns added');
+  } catch (err) {
+    console.log('Pharmacy hours columns might already exist:', err.message);
+  }
+}
+addPharmacyHoursColumns();
+
 router.get('/pharmacies', async (req, res) => {
   try {
     const { status, city } = req.query;
