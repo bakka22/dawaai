@@ -8,6 +8,7 @@ import 'features/orders/presentation/pages/orders_list_page.dart';
 import 'features/home/presentation/pages/profile_page.dart';
 import 'features/cosmetic/data/cosmetic_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/services/whatsapp_help_service.dart';
 
 void main() {
   runApp(const ProviderScope(child: DawaaiApp()));
@@ -71,6 +72,9 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _pages[_currentIndex],
+      floatingActionButton: const FloatingHelpButton(
+        customMessage: 'Hello, I need help with the Dawaai app',
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {

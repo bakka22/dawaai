@@ -649,4 +649,89 @@ router.get('/:order_id/pharmacy-address', async (req, res) => {
   }
 });
 
+router.get('/:order_id/billing', async (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const parsedId = parseInt(order_id);
+
+    if (isNaN(parsedId) || parsedId <= 0) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+
+    const orderResult = await pool.query(
+      `SELECT o.*, u.phone as customer_phone
+       FROM orders o
+       JOIN users u ON o.customer_id = u.id
+       WHERE o.id = $1`,
+      [order_id]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const order = orderResult.rows[0];
+
+    const segmentsResult = await pool.query(
+      `SELECT os.*, p.name as pharmacy_name
+       FROM order_segments os
+       JOIN pharmacies p ON os.pharmacy_id = p.id
+       WHERE os.order_id = $1
+       ORDER BY os.id ASC`,
+      [order_id]
+    );
+
+    const segments = segmentsResult.rows;
+
+    let subtotalA = 0;
+    let subtotalB = 0;
+    let totalDeliveryFee = 0;
+
+    if (segments.length > 0) {
+      subtotalA = parseFloat(segments[0].subtotal) || 0;
+      totalDeliveryFee = parseFloat(segments[0].delivery_fee) || 0;
+      
+      if (segments.length > 1) {
+        subtotalB = parseFloat(segments[1].subtotal) || 0;
+      }
+    }
+
+    const segmentsTotal = subtotalA + subtotalB;
+    const orderTotal = parseFloat(order.total_price) || 0;
+    const calculatedTotal = segmentsTotal + totalDeliveryFee;
+    
+    const isValid = Math.abs(calculatedTotal - orderTotal) < 0.01;
+
+    res.json({
+      order_id: order.id,
+      currency: 'SDG',
+      segments_summary: {
+        pharmacy_a: segments.length > 0 ? {
+          name: segments[0].pharmacy_name,
+          subtotal: subtotalA,
+        } : null,
+        pharmacy_b: segments.length > 1 ? {
+          name: segments[1].pharmacy_name,
+          subtotal: subtotalB,
+        } : null,
+      },
+      calculation: {
+        subtotal_a: subtotalA,
+        subtotal_b: subtotalB,
+        delivery_fee: totalDeliveryFee,
+        user_total: calculatedTotal,
+      },
+      verification: {
+        segments_total: segmentsTotal,
+        order_total: orderTotal,
+        is_valid: isValid,
+        difference: orderTotal - calculatedTotal,
+      },
+    });
+  } catch (err) {
+    console.error('Get billing error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

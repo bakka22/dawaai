@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/api_client.dart';
 import '../../../auth/data/auth_state.dart';
+import '../../../order/data/order_polling_service.dart';
 
 class OrdersListPage extends ConsumerStatefulWidget {
   const OrdersListPage({super.key});
@@ -14,11 +16,72 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
   List<dynamic> _orders = [];
   bool _isLoading = true;
   String? _error;
+  StreamSubscription<OrderStatusUpdate>? _pollingSubscription;
+  final Set<int> _activeOrderIds = {};
+
+  static const _activeStatuses = [
+    'PENDING',
+    'CONFIRMED',
+    'PREPARING',
+    'READY_FOR_PICKUP',
+    'IN_TRANSIT',
+    'DISPATCHED',
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadOrders();
+  }
+
+  @override
+  void dispose() {
+    _pollingSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _startPollingForActiveOrders() {
+    final pollingService = ref.read(orderPollingServiceProvider);
+    pollingService.stopPolling();
+    _pollingSubscription?.cancel();
+
+    final activeOrderIds = _orders
+        .where((o) => _activeStatuses.contains(o['status']))
+        .map((o) => o['id'] as int)
+        .toSet();
+
+    if (activeOrderIds.isEmpty) return;
+
+    _activeOrderIds
+      ..clear()
+      ..addAll(activeOrderIds);
+
+    final firstActiveId = activeOrderIds.first;
+    pollingService.startPolling(firstActiveId);
+
+    _pollingSubscription = pollingService.statusStream.listen((update) {
+      if (update.orderId == firstActiveId && mounted) {
+        _updateOrderStatus(update.orderId, update.status);
+      }
+    });
+  }
+
+  void _updateOrderStatus(int orderId, String newStatus) {
+    setState(() {
+      final index = _orders.indexWhere((o) => o['id'] == orderId);
+      if (index != -1) {
+        final order = Map<String, dynamic>.from(_orders[index]);
+        order['status'] = newStatus;
+        _orders[index] = order;
+
+        if (!_activeStatuses.contains(newStatus)) {
+          _activeOrderIds.remove(orderId);
+          if (_activeOrderIds.isEmpty) {
+            _pollingSubscription?.cancel();
+          }
+        }
+      }
+    });
   }
 
   Future<void> _loadOrders() async {
@@ -41,6 +104,8 @@ class _OrdersListPageState extends ConsumerState<OrdersListPage> {
         _orders = response.data['orders'] as List<dynamic>? ?? [];
         _isLoading = false;
       });
+
+      _startPollingForActiveOrders();
     } catch (e) {
       setState(() {
         _isLoading = false;
