@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 require('./services/storageService');
 const logger = require('./middleware/logger');
+const authMiddleware = require('./middleware/authMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,18 +26,21 @@ const pharmacistRoutes = require('./routes/pharmacist');
 const paymentsRoutes = require('./routes/payments');
 const adminRoutes = require('./routes/admin');
 
+// Public routes (no authentication required)
 app.use('/api', relayRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/meds', medsRoutes);
-app.use('/api/search', searchRoutes);
-app.use('/api/quotes', quotesRoutes);
-app.use('/api/orders', ordersRoutes);
-app.use('/api/logistics', logisticsRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/cosmetics', cosmeticsRoutes);
-app.use('/api/pharmacist', pharmacistRoutes);
-app.use('/api/payments', paymentsRoutes);
-app.use('/api/admin', adminRoutes);
+
+// Protected routes (require authentication)
+app.use('/api/meds', authMiddleware, medsRoutes);
+app.use('/api/search', authMiddleware, searchRoutes);
+app.use('/api/quotes', authMiddleware, quotesRoutes);
+app.use('/api/orders', authMiddleware, ordersRoutes);
+app.use('/api/logistics', authMiddleware, logisticsRoutes);
+app.use('/api/user', authMiddleware, userRoutes);
+app.use('/api/cosmetics', authMiddleware, cosmeticsRoutes);
+app.use('/api/pharmacist', authMiddleware, pharmacistRoutes);
+app.use('/api/payments', authMiddleware, paymentsRoutes);
+app.use('/api/admin', authMiddleware, adminRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });

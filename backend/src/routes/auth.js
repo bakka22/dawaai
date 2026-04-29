@@ -3,6 +3,7 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const pool = require('../db/config');
+const { isTokenBlacklisted, addToBlacklist } = require('../services/tokenBlacklist');
 
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY = '30d';
@@ -23,17 +24,42 @@ function generateRefreshToken(user) {
   );
 }
 
+function normalizePhoneNumber(phone) {
+  const digits = phone.replace(/\D/g, '');
+  
+  if (digits.length === 10 && digits.startsWith('0')) {
+    return '+249' + digits.substring(1);
+  }
+  
+  if (phone.startsWith('+')) {
+    return phone;
+  }
+  
+  if (digits.length === 12 && digits.startsWith('249')) {
+    return '+' + digits;
+  }
+  
+  if (digits.length === 9 && /^[987]/.test(digits)) {
+    return '+249' + digits;
+  }
+  
+  return phone;
+}
+
+
 router.post('/login', async (req, res) => {
   try {
     const { phone, password } = req.body;
 
-    if (!phone || !password) {
+    const normalizedPhone = normalizePhoneNumber(phone);
+
+    if (!normalizedPhone || !password) {
       return res.status(400).json({ error: 'Phone and password required' });
     }
 
     const result = await pool.query(
       'SELECT id, phone, role, password_hash, refresh_token_hash FROM users WHERE phone = $1',
-      [phone]
+      [normalizedPhone]
     );
 
     if (result.rows.length === 0) {
@@ -119,7 +145,10 @@ router.post('/register', async (req, res) => {
   try {
     const { phone, password, role = 'customer', name } = req.body;
 
-    if (!phone || !password) {
+    // Normalize phone number to ensure consistent format
+    const normalizedPhone = normalizePhoneNumber(phone);
+
+    if (!normalizedPhone || !password) {
       return res.status(400).json({ error: 'Phone and password required' });
     }
 
@@ -134,7 +163,7 @@ router.post('/register', async (req, res) => {
       `INSERT INTO users (phone, role, password_hash, refresh_token_hash) 
        VALUES ($1, $2, $3, $3) 
        RETURNING id, phone, role`,
-      [phone, role, hashedPassword]
+      [normalizedPhone, role, hashedPassword]
     );
 
     const user = result.rows[0];
@@ -157,6 +186,84 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Phone already registered' });
     }
     console.error('Register error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/logout', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authorization token required' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Token required' });
+    }
+    
+    let userId = null;
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      userId = decoded.id;
+    } catch (e) {
+      // If token is invalid, we still want to blacklist it based on the token itself
+      // In a real implementation, we might not be able to get userId from an invalid token
+    }
+    
+    await addToBlacklist(token, userId);
+    
+    res.json({
+      success: true,
+      message: 'Logged out successfully. Token has been blacklisted.'
+    });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/me', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authorization token required' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Token required' });
+    }
+
+    const isBlacklisted = await isTokenBlacklisted(token);
+    if (isBlacklisted) {
+      return res.status(401).json({ error: 'Token has been revoked' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    const result = await pool.query(
+      'SELECT id, phone, role FROM users WHERE id = $1',
+      [decoded.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    res.json({ user: result.rows[0] });
+  } catch (err) {
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired' });
+    }
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    console.error('Get me error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

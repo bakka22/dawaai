@@ -1,265 +1,130 @@
 # AGENTS.md
 
 ## Project Structure
-
-This repository has two main directories:
-
-```text
-/backend      → API, business logic, database, auth, server-side configuration
-/flutter_app  → Flutter mobile application, UI, client-side services, app assets
-```
-
-Rules:
-- Backend work must stay inside `/backend`.
-- Flutter work must stay inside `/flutter_app`.
-- Do not mix backend and Flutter changes in the same commit unless the task explicitly requires a full-stack change.
-- Do not create new root-level directories unless explicitly approved.
-- Keep the repository root clean. Root files should be limited to documentation and project-level config.
-
----
-
-## Work Tree Safety Rules — Critical
-
-The work tree must be protected at all times.
-
-Before running any command that can overwrite, discard, reset, switch, clean, rebase, merge, or otherwise modify existing work, the agent must first inspect the current state:
-
-```bash
-git status --short
-git diff
-git diff --staged
-```
-
-The agent must not proceed if there are uncommitted changes that are unrelated to the current task.
-
-### Forbidden without explicit user approval
-
-Never run these commands unless the user clearly approves after being warned that work may be lost:
-
-```bash
-git checkout .
-git checkout -- <file>
-git restore .
-git restore <file>
-git reset --hard
-git clean -fd
-git clean -fdx
-git stash -u
-git stash --all
-git rebase
-git merge
-git switch <branch>
-git checkout <branch>
-```
-
-### Branch switching rule
-
-Before switching branches:
-
-1. Run `git status --short`.
-2. If there are changes, stop and report them.
-3. Ask the user whether to commit, stash, or cancel.
-4. Do not choose automatically.
-
-### File overwrite rule
-
-Before editing or replacing any file:
-
-- Check whether the file has uncommitted changes.
-- Preserve user edits.
-- Prefer small targeted edits over full-file rewrites.
-- Never overwrite a file just to “simplify” the task.
-
-### User work protection rule
-
-Uncommitted user work is more important than completing the task quickly.
-
-If there is any risk of data loss, stop and ask.
-
----
-
-## Source Control Rules
-
-### Branches
-
-- `main` must remain production-ready.
-- `dev` is the integration branch.
-- Use short task branches:
-
-```text
-feature/<name>
-fix/<name>
-refactor/<name>
-```
-
-### Commits
-
-Use clear scoped commits:
-
-```text
-feat(backend): add clinic filtering
-fix(flutter): resolve login token handling
-refactor(api): simplify auth middleware
-```
-
-Avoid vague commits such as:
-
-```text
-update
-changes
-fix stuff
-final
-```
-
-### Commit discipline
-
-- Do not mix unrelated changes in one commit.
-- Do not commit secrets, tokens, `.env`, generated build folders, or local IDE files.
-- Do not commit dependency lockfile changes unless they are expected.
-- Run relevant tests or analysis before committing when possible.
-
----
-
-## Flutter App Commands
-
-Run from `/flutter_app`:
-
-```bash
-flutter run
-flutter run -d <device_id>
-flutter build apk --debug
-flutter build apk --release
-flutter test
-flutter analyze
-flutter format .
-```
-
----
-
-## Backend Commands
-
-Run from `/backend`:
-
-```bash
-npm install           # Install dependencies
-npm run dev          # Start development server
-npm test             # Run tests
-```
-
-**Entry point**: `backend/src/index.js`
-
----
-
-## Testing Rules
-
-### TDD Workflow (Required for all tasks)
-
-Before implementing any feature or fix:
-
-1. **Write Tests First**: Create tests that define the intended behavior based on `@MVP-Plan.md` and `@SPEC.md`
-   - Backend tasks → Write tests in `backend/tests/`
-   - Flutter tasks → Write tests in `flutter_app/test/`
-   - Full-stack tasks → Write tests in both
-
-2. **Test Coverage Requirements**:
-   - **Normal cases**: Happy path behavior
-   - **Edge cases**: Boundary conditions, empty inputs, null values
-   - **Error cases**: Invalid inputs, network failures, validation errors
-
-3. **Run Tests Before Implementation**:
-   - Tests should fail initially (RED) because the feature doesn't exist yet
-   - This validates the tests are correct
-
-4. **Implement the Feature**: Write the minimum code needed to pass tests (GREEN)
-
-5. **Run Tests After Implementation**:
-   - All tests must pass with no errors
-   - Run `npm test` in `/backend`
-   - Run `flutter test` in `/flutter_app`
-   - Run `flutter analyze` to check for issues
-
-### Hard Rule: All Tests Must Pass
-
-**ALL TESTS MUST PASS BEFORE MOVING TO THE NEXT PHASE**
-
-- No exceptions: 100% test pass rate required
-- If any test fails, fix it before proceeding
-- This applies to both backend (`npm test`) and Flutter (`flutter test`)
-- Run full test suite after implementing each phase
-- Do not skip or ignore failing tests
-
-### General Testing Guidelines
-
-- Run the smallest relevant test first.
-- For Flutter UI changes, run `flutter analyze` and relevant widget tests.
-- For backend logic, run service/API tests where available.
-- Do not ignore failing tests unless the failure is clearly unrelated and reported.
-
-### Soft Rule: Commit After Phase Completion
-
-After completing a phase where all tests pass:
-- Check for unstaged work (`git status --short`)
-- If there are unstaged changes, stage, commit and push to remote
-- Use descriptive commit messages indicating what was done
-
----
-
-## Environment and Secrets
-
-- Never commit `.env`, private keys, tokens, certificates, or credentials.
-- Keep `.env.example` updated with required variable names only.
-- Do not hardcode API URLs, database credentials, or secret keys.
-
----
-
-## Code Quality Rules
-
-- Keep changes focused and minimal.
-- Prefer readable code over clever code.
-- Keep business logic out of Flutter UI widgets.
-- Keep database access out of controllers when a service layer exists.
-- Avoid large refactors unless explicitly requested.
-- Do not rename files, classes, routes, or public APIs without a clear reason.
-
----
-
-## Agent Behavior Rules
-
-- **Always use the appropriate skill for each task:**
-  - Backend/Node.js tasks → use `nodejs-backend` skill
-  - Flutter UI/UX tasks → use `flutter-frontend-design` skill
-  - Flutter architecture/code tasks → use `flutter-code-structure` skill
-
-- **Explicitly state the skill being used** when starting work on any task.
-
-- Explain risky operations before doing them.
-- Ask before destructive operations.
-- Preserve existing project style.
-- Do not silently change architecture.
-- Do not assume uncommitted changes are disposable.
-- When unsure, stop and ask.
-
----
-
-## Project-Specific Details
-
-### Environment Variables (Backend)
-
-Create `.env` in `/backend`:
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` (PostgreSQL)
-- `GOOGLE_CLOUD_VISION_API_KEY` (for OCR)
-- `JWT_SECRET`
-
-### Key Architecture Notes
-
-1. **OCR Flow**: Camera → Image → Base64 → Google Cloud Vision API → Extract text → Parse medications → User confirms
-
-2. **Search Algorithm**:
-   - Backend compares extracted medications against pharmacy inventories
-   - Sort by: (1) most medications matched, (2) nearest distance
-   - Search starts in user's city, option to expand to nearby cities
-   - Distance calculated via lat/lng coordinates (OSM Nominatim for geocoding)
-
-3. **Pharmacy Approval**: Manual admin approval required before pharmacy goes live
-
-4. **Arabic RTL**: Use `flutter_localizations` and `Directionality` widget for full RTL support
+- `/backend` → API, business logic, database, auth, server-side (Node.js/Express)
+- `/flutter_app` → Flutter mobile app, UI, client-side services, assets
+
+## Critical Rules
+- Backend work MUST stay in `/backend`; Flutter work in `/flutter_app`
+- Never mix backend/Flutter changes in same commit unless task requires full-stack
+- Do not create new root-level directories without explicit approval
+- Keep repository root clean: only documentation and project-level config
+
+## Developer Commands
+
+### Backend (`/backend`)
+- Install: `npm install`
+- Dev server: `npm run dev` (starts `src/index.js`)
+- Test: `npm test` (Jest, excludes `src/index.js` & storage service)
+- Entry point: `backend/src/index.js`
+- Required `.env` vars: `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `GOOGLE_CLOUD_VISION_API_KEY`, `JWT_SECRET`
+
+### Flutter (`/flutter_app`)
+- Run: `flutter run` or `flutter run -d <device_id>`
+- Test: `flutter test`
+- Analyze: `flutter analyze`
+- Format: `flutter format .`
+- Build APK: `flutter build apk --debug` or `--release`
+- Main entry: `lib/main.dart`
+- State management: Riverpod (`flutter_riverpod`)
+- Primary locale: Arabic (`Locale('ar')`), with English fallback
+- RTL implementation: Uses `flutter_localizations` + `Directionality` widget
+
+## Architecture Notes
+1. **OCR Flow**: Camera → Image → Base64 → Google Cloud Vision API (via AWS Proxy) → Extract text → Parse medications → User confirms
+   - **AWS Relay Required**: Mobile App → AWS Proxy Server (Global) → Google Cloud Vision → AWS Proxy → Mobile App (to bypass regional blocking in Sudan)
+2. **Search Algorithm**: 
+   - Compares extracted meds against pharmacy inventories
+   - Sorts by: (1) most medications matched, (2) nearest distance
+   - Starts in user's city, expand to nearby cities
+   - Distance via lat/lng (OSM Nominatim for geocoding)
+3. **Auth System**: Hybrid - Firebase (primary) + WhatsApp (fallback for service failures)
+4. **Pharmacy Approval**: Manual admin approval required before pharmacy goes live
+5. **Firebase**: Used for cloud messaging (FCM)
+6. **Regulatory Safety**: High-risk medications trigger "Triple-Leg" driver trip: [Customer → Pharmacy → Customer]
+7. **Core Workflow**: Scan → Verify → Broadcast Quote → Live Bids → Order → Regulatory Delivery
+
+## Testing (TDD Required)
+1. Write tests FIRST based on `@MVP-Plan.md` and `@SPEC.md`
+   - Backend: `backend/tests/`
+   - Flutter: `flutter_app/test/`
+   - Full-stack: both locations
+2. Test coverage must include:
+   - Normal cases (happy path)
+   - Edge cases (boundary, empty, null)
+   - Error cases (invalid input, network failures, validation)
+3. Run tests BEFORE implementation (should fail RED)
+4. Implement minimum code to pass tests (GREEN)
+5. Run tests AFTER implementation:
+   - Backend: `npm test`
+   - Flutter: `flutter test` + `flutter analyze`
+6. **HARD RULE**: ALL TESTS MUST PASS before proceeding
+   - No exceptions: 100% pass rate required
+   - Fix failing tests before continuing
+   - Run full test suite after each phase
+   - Never skip/ignore failing tests
+
+## Work Tree Protection
+- ALWAYS inspect state before destructive commands:
+  ```bash
+  git status --short
+  git diff
+  git diff --staged
+  ```
+- NEVER run these without explicit user approval (work may be lost):
+  - `git checkout .`, `git checkout -- <file>`
+  - `git restore .`, `git restore <file>`
+  - `git reset --hard`
+  - `git clean -fd`, `git clean -fdx`
+  - `git stash -u`, `git stash --all`
+  - `git rebase`, `git merge`
+  - `git switch <branch>`, `git checkout <branch>`
+- Before switching branches:
+  1. Check `git status --short`
+  2. If changes, stop and report
+  3. Ask user: commit, stash, or cancel
+  4. Never choose automatically
+- Before editing/replacing any file:
+  - Check for uncommitted changes
+  - Preserve user edits
+  - Prefer small targeted edits over full rewrites
+  - Never overwrite just to "simplify" task
+- Uncommitted user work > task completion speed
+- If risk of data loss, STOP and ask
+
+## Source Control
+- Branches:
+  - `main`: production-ready
+  - `dev`: integration branch
+  - Task branches: `feature/<name>`, `fix/<name>`, `refactor/<name>`
+- Commits:
+  - Use clear scoped commits:
+    - `feat(backend): add clinic filtering`
+    - `fix(flutter): resolve login token handling`
+    - `refactor(api): simplify auth middleware`
+  - Avoid vague commits: `update`, `changes`, `fix stuff`, `final`
+  - Never mix unrelated changes
+  - Never commit secrets, tokens, `.env`, build folders, IDE files
+  - Don't commit lockfile changes unless expected
+  - Run relevant tests/analysis before committing when possible
+
+## Code Quality
+- Keep changes focused and minimal
+- Prefer readable code over clever code
+- Keep business logic out of Flutter UI widgets
+- Keep database access out of controllers when service layer exists
+- Avoid large refactors unless explicitly requested
+- Do not rename files, classes, routes, or public APIs without clear reason
+
+## Agent Behavior
+- ALWAYS use appropriate skill:
+  - Backend/Node.js → `nodejs-backend` skill
+  - Flutter UI/UX → `flutter-frontend-design` skill
+  - Flutter architecture/code → `flutter-code-structure` skill
+- EXPLICITLY state skill being used when starting task
+- Explain risky operations before doing them
+- Ask before destructive operations
+- Preserve existing project style
+- Do not silently change architecture
+- Do not assume uncommitted changes are disposable
+- When unsure, STOP and ask
